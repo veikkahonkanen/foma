@@ -20,12 +20,23 @@
 #include <stdio.h>
 #include <limits.h>
 #include <getopt.h>
-#include <unistd.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include "fomalib.h"
+
+#ifdef _WIN32
+  #include <winsock2.h>
+  #include <ws2tcpip.h>
+  #pragma comment(lib, "ws2_32.lib")
+#else
+  #include <sys/socket.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <unistd.h>
+#endif
+
+#ifdef _WIN32
+#define close(fd) closesocket(fd)
+#endif
 
 #define LINE_LIMIT 262144
 #define UDP_MAX 65535
@@ -118,6 +129,14 @@ int main(int argc, char *argv[]) {
     int opt, sortarcs = 1;
     char *infilename;
     struct fsm *net;
+
+		#ifdef _WIN32
+			WSADATA wsaData;
+			if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
+					fprintf(stderr, "WSAStartup failed\n");
+					return 1;
+			}
+		#endif
 
     setvbuf(stdout, buffer, _IOFBF, sizeof(buffer));
 
@@ -278,6 +297,9 @@ int main(int argc, char *argv[]) {
 	}
     }
    /* Cleanup */
+	#ifdef _WIN32
+		WSACleanup();
+	#endif
     for (chain_pos = chain_head; chain_pos != NULL; chain_pos = chain_head) {
 	chain_head = chain_pos->next;
 	if (chain_pos->ah != NULL) {
@@ -355,6 +377,7 @@ void handle_line(char *s) {
 }
 
 void server_init(void) {
+
     unsigned int rcvsize = 262144;
     int retval;
     char server_address_string[INET_ADDRSTRLEN];
